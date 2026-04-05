@@ -91,7 +91,7 @@ def solve_linear_nnls(persona_lps, mixture_lps):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="results/logprobs.pt")
+    parser.add_argument("--input", type=str, default="results/logprobs_diff.pt")
     args = parser.parse_args()
 
     data = torch.load(args.input, weights_only=False)

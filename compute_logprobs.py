@@ -20,16 +20,7 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
-BASE_MODEL = "SimpleStories/SimpleStories-35M"
-
-PERSONA_DIRS = [
-    "persona_a_moralistic_teacher",
-    "persona_a_poet",
-    "persona_a_philosopher",
-    "persona_a_jester_archetype",
-    "persona_someone_evil",
-    "persona_a_rebellious_author",
-]
+BASE_MODEL = "HuggingFaceTB/SmolLM2-135M-Instruct"
 
 
 class StoryDataset(Dataset):
@@ -99,7 +90,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", type=str, default="data/")
     parser.add_argument("--models_dir", type=str, default="models/")
-    parser.add_argument("--output", type=str, default="results/logprobs.pt")
+    parser.add_argument("--output", type=str, default="results/logprobs_diff.pt")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--max_length", type=int, default=512)
     args = parser.parse_args()
@@ -111,7 +102,7 @@ def main():
     eval_path = Path(args.data_dir) / "eval.json"
     with open(eval_path) as f:
         eval_data = json.load(f)
-    stories = [e["story"] for e in eval_data]
+    stories = [e["text"] for e in eval_data]
     indices = [e["index"] for e in eval_data]
     print(f"Eval stories: {len(stories)}")
 
@@ -131,9 +122,20 @@ def main():
     model_logprobs["base"] = token_lps
     token_counts = mask.sum(dim=-1)  # (n_examples,)
 
-    # Persona models
+    # Discover persona models from metadata or filesystem
     models_dir = Path(args.models_dir)
-    for persona_dir in PERSONA_DIRS:
+    meta_path = Path(args.data_dir) / "meta.json"
+    if meta_path.exists():
+        with open(meta_path) as f:
+            meta = json.load(f)
+        persona_dirs = [f"persona_{slug}" for slug in meta["slugs"].values()]
+    else:
+        persona_dirs = sorted(
+            d.name for d in models_dir.iterdir()
+            if d.is_dir() and d.name.startswith("persona_")
+        )
+
+    for persona_dir in persona_dirs:
         lora_path = models_dir / persona_dir
         if not lora_path.exists():
             print(f"Skipping {persona_dir}: not found")
@@ -147,7 +149,7 @@ def main():
         torch.cuda.empty_cache()
 
     # Mixture model
-    mixture_path = models_dir / "mixture_uniform"
+    mixture_path = models_dir / "mixture_uniform_diff"
     if mixture_path.exists():
         print("Computing logprobs: mixture_uniform")
         lora_model = load_lora_model(base_model, mixture_path, device)

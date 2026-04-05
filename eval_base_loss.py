@@ -12,13 +12,13 @@ import numpy as np
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-BASE_MODEL = "SimpleStories/SimpleStories-35M"
+BASE_MODEL = "HuggingFaceTB/SmolLM2-135M-Instruct"
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, required=True, help="Path to JSON data file")
-    parser.add_argument("--text_column", type=str, default="story")
+    parser.add_argument("--text_column", type=str, default="text")
     parser.add_argument("--max_seq_length", type=int, default=512)
     parser.add_argument("--max_samples", type=int, default=None)
     args = parser.parse_args()

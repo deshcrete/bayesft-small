@@ -1,25 +1,17 @@
 """
-Train 6 persona LoRA adapters on SimpleStories-35M.
+Train persona LoRA adapters (one per persona discovered from data/meta.json).
 
 Usage:
     python train_personas.py --data_dir data/ --output_dir models/
 """
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
 
-PERSONAS = [
-    "a_moralistic_teacher",
-    "a_poet",
-    "a_philosopher",
-    "a_jester_archetype",
-    "someone_evil",
-    "a_rebellious_author",
-]
-
-BASE_MODEL = "SimpleStories/SimpleStories-35M"
+BASE_MODEL = "HuggingFaceTB/SmolLM2-135M-Instruct"
 
 
 def main():
@@ -28,25 +20,31 @@ def main():
     parser.add_argument("--output_dir", type=str, default="models/")
     parser.add_argument("--lora_r", type=int, default=16)
     parser.add_argument("--lora_alpha", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=2)
-    parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--grad_accum", type=int, default=1)
+    parser.add_argument("--grad_accum", type=int, default=2)
     parser.add_argument("--max_seq_length", type=int, default=512)
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
     output_dir = Path(args.output_dir)
 
-    for persona in PERSONAS:
-        data_file = data_dir / f"{persona}.json"
+    # Load persona slugs from metadata
+    meta_path = data_dir / "meta.json"
+    with open(meta_path) as f:
+        meta = json.load(f)
+    slugs = list(meta["slugs"].values())
+
+    for slug in slugs:
+        data_file = data_dir / f"{slug}.json"
         if not data_file.exists():
-            print(f"Skipping {persona}: {data_file} not found")
+            print(f"Skipping {slug}: {data_file} not found")
             continue
 
-        model_out = output_dir / f"persona_{persona}"
+        model_out = output_dir / f"persona_{slug}"
         print(f"\n{'='*60}")
-        print(f"Training persona: {persona}")
+        print(f"Training persona: {slug}")
         print(f"  Data: {data_file}")
         print(f"  Output: {model_out}")
         print(f"{'='*60}\n")
@@ -57,7 +55,7 @@ def main():
             "--dataset_name", "json",
             "--data_files", str(data_file),
             "--dataset_split", "train",
-            "--text_column", "story",
+            "--text_column", "text",
             "--output_dir", str(model_out),
             "--lora_r", str(args.lora_r),
             "--lora_alpha", str(args.lora_alpha),
@@ -70,10 +68,10 @@ def main():
 
         result = subprocess.run(cmd)
         if result.returncode != 0:
-            print(f"FAILED: {persona}")
+            print(f"FAILED: {slug}")
             sys.exit(1)
 
-        print(f"Done: {persona}\n")
+        print(f"Done: {slug}\n")
 
     print("All persona models trained.")
 
